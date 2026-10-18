@@ -11,10 +11,24 @@ import re
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from html import escape
 from pathlib import Path
 
-from common import _is_free, _opener
+# This generator is standalone; common.py was not included in this repository.
+_opener = urllib.request.build_opener()
+
+
+def _is_free(pricing, field):
+    """Only an explicit finite zero price is evidence of a free model."""
+    value = pricing.get(field)
+    if value is None or isinstance(value, bool):
+        return False
+    try:
+        price = Decimal(str(value))
+    except InvalidOperation:
+        return False
+    return price.is_finite() and price == 0
 
 OUT_DIR = Path(__file__).parent / "docs"
 OUT_DIR.mkdir(exist_ok=True)
@@ -1490,7 +1504,13 @@ CHEVRON_SVG = (
 )
 
 
+def public_provider_error(error):
+    """Publish no upstream exception text: URLs can contain account IDs or tokens."""
+    return "Provider temporarily unavailable." if error is not None else None
+
+
 def render_provider(p, models, error=None, delta=None):
+    error = public_provider_error(error)
     color = p["color"]
     label = escape(p["label"])
     url = p["url"]
@@ -1900,7 +1920,7 @@ def main():
             "name": p["label"],
             "url": p["url"],
             "models": results[p["key"]],
-            "error": str(errors[p["key"]]) if p["key"] in errors else None,
+            "error": public_provider_error(errors.get(p["key"])),
         }
 
     # Enrich every model with a best-effort parameter count (billions) parsed

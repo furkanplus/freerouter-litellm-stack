@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Final
 
 import yaml
 
+from freerouter.errors import PolicyError
 from freerouter.registry import matches_any
 
 if TYPE_CHECKING:
@@ -87,8 +88,7 @@ def parse_params(model_id: str) -> float | None:
 
 def hard_rejection(model_id: str) -> str | None:
     """Reject by name alone: a denied family or a stated size below the floor."""
-    # Match the model name, not the vendor path: "*micro*" is meant for
-    # granite-…-micro and would otherwise reject every microsoft/… model.
+    # Publisher namespaces are not model-family names.
     if matches_any(model_id.rsplit("/", 1)[-1], DENY):
         return "not a chat-agent model"
     params = parse_params(model_id)
@@ -204,11 +204,18 @@ def _read(path: Path) -> dict[str, object]:
     """Read one optional YAML mapping, treating a missing file as empty."""
     if not path.exists():
         return {}
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return loaded if isinstance(loaded, dict) else {}
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        raise PolicyError(path=str(path), reason="malformed YAML") from error
+    if loaded is None:
+        return {}
+    if not isinstance(loaded, dict):
+        raise PolicyError(path=str(path), reason="expected a mapping")
+    return loaded
 
 
-def load_policy(directory: Path = DEFAULT_POLICY_DIR) -> Policy:
+def _load_policy(directory: Path) -> Policy:
     """Load ``aliases.yaml``, ``roles.yaml`` and ``capabilities.yaml`` from ``directory``."""
     aliases = _read(directory / "aliases.yaml")
     merge = {str(k): str(v) for k, v in (aliases.get("merge") or {}).items()}
@@ -234,3 +241,13 @@ def load_policy(directory: Path = DEFAULT_POLICY_DIR) -> Policy:
             keep=spec.get("keep") if isinstance(spec.get("keep"), bool) else None,
         )
     return Policy(merge=merge, exclude=exclude, roles=roles, overrides=overrides)
+
+
+def load_policy(directory: Path = DEFAULT_POLICY_DIR) -> Policy:
+    """Load policy atomically; a bad edit must not become an empty routing policy."""
+    try:
+        return _load_policy(directory)
+    except (AttributeError, TypeError, ValueError) as error:
+        raise PolicyError(
+            path=str(directory), reason="invalid policy structure or value"
+        ) from error
