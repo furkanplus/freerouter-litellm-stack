@@ -53,6 +53,13 @@ def test_tiny_and_non_chat_models_are_rejected_by_name() -> None:
     assert hard_rejection("deepseek-v4.1-flash") is None
 
 
+def test_the_name_filter_ignores_the_vendor_path() -> None:
+    # "*micro*" targets granite-…-micro, not the microsoft/ vendor prefix.
+    assert hard_rejection("microsoft/mai-ds-r1:free") is None
+    assert hard_rejection("microsoft/phi-4-reasoning-plus") is None
+    assert hard_rejection("@cf/ibm/granite-4.0-h-micro") is not None
+
+
 def test_the_cap_keeps_the_biggest_usable_models_not_the_first_alphabetically() -> None:
     # Given: upstream sorted alphabetically and cut, keeping llama-3.2-1b over gpt-oss-120b
     provider = make_provider(max_models=2)

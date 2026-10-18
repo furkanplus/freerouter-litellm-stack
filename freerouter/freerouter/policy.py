@@ -87,7 +87,9 @@ def parse_params(model_id: str) -> float | None:
 
 def hard_rejection(model_id: str) -> str | None:
     """Reject by name alone: a denied family or a stated size below the floor."""
-    if matches_any(model_id, DENY):
+    # Match the model name, not the vendor path: "*micro*" is meant for
+    # granite-…-micro and would otherwise reject every microsoft/… model.
+    if matches_any(model_id.rsplit("/", 1)[-1], DENY):
         return "not a chat-agent model"
     params = parse_params(model_id)
     if params is not None and params < MIN_PARAMS_B:
