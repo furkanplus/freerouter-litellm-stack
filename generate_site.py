@@ -8,6 +8,7 @@ import concurrent.futures
 import json
 import os
 import re
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from html import escape
@@ -69,7 +70,9 @@ def _get(url, headers=None, timeout=20):
                 else body
             )
     except Exception as e:
-        raise RuntimeError(f"GET {url} → {e}")
+        # Host only: this message lands in the public models.json / index.html, and
+        # a path can carry account ids (Cloudflare's /accounts/<id>/...).
+        raise RuntimeError(f"GET {urllib.parse.urlsplit(url).netloc} → {e}") from e
 
 
 # ── Provider fetchers (same logic as sync_models.py) ─────────────────────────
