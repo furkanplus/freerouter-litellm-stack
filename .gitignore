@@ -1,0 +1,16 @@
+# Secrets and local state of the live stack — never commit these.
+.env
+data/
+logs/
+freerouter/state/*
+!freerouter/state/.gitkeep
+
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store
