@@ -118,7 +118,10 @@ def cmd_daemon(_: Sequence[str]) -> int:
     while True:
         try:
             _log_report(run_cycle(settings))
-        except (RegistryError, OSError):
+        except Exception:  # one bad cycle must not stop the daemon
+            # policy/*.yaml is hot-mounted: a typo there raises ValueError or
+            # yaml.YAMLError, and letting it escape put the container in a
+            # crash-restart loop that stopped the pool from healing.
             LOGGER.exception("refresh cycle failed")
         time.sleep(settings.interval)
 

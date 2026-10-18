@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 import urllib.parse
@@ -99,7 +100,9 @@ def request(
             return Response(status=response.status, body=response.read())
     except urllib.error.HTTPError as error:
         return Response(status=error.code, body=error.read())
-    except (OSError, urllib.error.URLError) as error:
+    except (OSError, urllib.error.URLError, http.client.HTTPException, ValueError) as error:
+        # HTTPException: a peer that drops mid-body (IncompleteRead) or answers
+        # garbage (BadStatusLine). ValueError: http.client.InvalidURL.
         return Response(status=0, body=str(error).encode())
 
 
