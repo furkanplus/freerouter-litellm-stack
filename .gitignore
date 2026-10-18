@@ -1,16 +1,24 @@
-# Secrets and local state of the live stack — never commit these.
+# Local credentials (keep documented templates versioned).
 .env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+credentials.json
+service-account*.json
+
+# Runtime databases, generated state and local tool caches.
 data/
 logs/
 freerouter/state/*
 !freerouter/state/.gitkeep
-
-# Python / tooling
-__pycache__/
-*.pyc
 .venv/
+__pycache__/
+*.py[cod]
 .pytest_cache/
 .ruff_cache/
-
-# macOS
+.basedpyright/
 .DS_Store

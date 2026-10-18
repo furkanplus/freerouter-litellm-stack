@@ -57,6 +57,7 @@ class ChangeRecord(BaseModel):
     detail: str
     model: str | None = None
 
+
 USAGE: Final = """FreeRouter 免费模型池维护工具
 
   freerouter refresh   跑一轮发现 + 探测 + 热更新，然后退出
@@ -118,10 +119,9 @@ def cmd_daemon(_: Sequence[str]) -> int:
     while True:
         try:
             _log_report(run_cycle(settings))
-        except Exception:  # one bad cycle must not stop the daemon
-            # policy/*.yaml is hot-mounted: a typo there raises ValueError or
-            # yaml.YAMLError, and letting it escape put the container in a
-            # crash-restart loop that stopped the pool from healing.
+        except Exception:
+            # A bad hot-mounted policy or unexpected provider error must not
+            # restart the daemon. BaseException (shutdown signals) still escapes.
             LOGGER.exception("refresh cycle failed")
         time.sleep(settings.interval)
 

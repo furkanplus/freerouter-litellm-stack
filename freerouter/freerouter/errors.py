@@ -65,3 +65,13 @@ class ReferralWithoutDisclosureError(ValueError):
             f"{self.provider_id}: `referral_url` requires `referral_note` describing what "
             "both sides receive. An undisclosed referral link must not ship."
         )
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyError(RuntimeError):
+    path: str
+    reason: str
+
+    @override
+    def __str__(self) -> str:
+        return f"invalid policy file {self.path}: {self.reason}"
