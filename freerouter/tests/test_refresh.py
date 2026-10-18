@@ -258,3 +258,38 @@ def test_state_and_changelog_land_on_disk(tmp_path: Path, monkeypatch: pytest.Mo
     state = load_state(settings.state_path)
     assert state.models["demo::alpha"].status is HealthStatus.HEALTHY
     assert settings.changelog_path.read_text(encoding="utf-8").count("\n") == 1
+
+
+def test_a_failed_request_in_the_call_log_is_counted_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given: a pooled model, then one failed request logged *after* the next cycle
+    # starts (the log is read later in the cycle than its start time).
+    provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
+    gateway = FakeGateway()
+    settings = _settings(tmp_path)
+    _wire(
+        monkeypatch,
+        gateway,
+        [provider],
+        {"demo": DiscoveryResult(provider_id="demo", models=("alpha",))},
+    )
+    _ = run_cycle(settings, {"DEMO_API_KEY": "k"})
+    deployment_id = next(iter(gateway.deployments))
+    logged_at = (datetime.now(UTC) + timedelta(minutes=5)).isoformat()
+    gateway.logs = (
+        {
+            "model_id": deployment_id,
+            "startTime": logged_at,
+            "status": "failure",
+            "metadata": {"error_information": {"error_code": "500", "error_message": "boom"}},
+        },
+    )
+
+    # When
+    _ = run_cycle(settings, {"DEMO_API_KEY": "k"})
+    _ = run_cycle(settings, {"DEMO_API_KEY": "k"})
+
+    # Then
+    health = load_state(settings.state_dir / "health.json").models["demo::alpha"]
+    assert health.consecutive_failures == 1

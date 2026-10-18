@@ -34,7 +34,12 @@ from freerouter.state import (
     state_key,
     utcnow,
 )
-from freerouter.traffic import context_signals, latest_observations, learned_ceiling
+from freerouter.traffic import (
+    context_signals,
+    latest_observations,
+    learned_ceiling,
+    newest_entry_time,
+)
 from freerouter.transport import as_items, as_strings, as_text, dig, request
 
 if TYPE_CHECKING:
@@ -353,8 +358,10 @@ def observe_traffic(
 
     if observed:
         LOGGER.info("real traffic verified %d models; no probe needed for them", len(observed))
+    newest = newest_entry_time(entries)
+    seen = max(filter(None, (newest, state.last_traffic_seen)), default=context.now)
     return (
-        state.model_copy(update={"models": models, "last_traffic_seen": context.now}),
+        state.model_copy(update={"models": models, "last_traffic_seen": seen}),
         events,
         frozenset(observed),
     )

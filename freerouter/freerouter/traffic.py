@@ -72,6 +72,17 @@ def _observation(entry: JsonValue) -> Observation | None:
     )
 
 
+def newest_entry_time(entries: Iterable[JsonValue]) -> datetime | None:
+    """Return the latest ``startTime`` in the call log, or None when it has none.
+
+    This is the traffic watermark: everything up to it has been read. The cycle's
+    start time is not, because requests logged between that moment and the read
+    would be read again on the next cycle.
+    """
+    times = (_parse_time(as_text(dig(entry, "startTime"))) for entry in entries)
+    return max(filter(None, times), default=None)
+
+
 def latest_observations(
     entries: Iterable[JsonValue],
     routes: Mapping[str, str],
