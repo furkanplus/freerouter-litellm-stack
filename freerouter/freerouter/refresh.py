@@ -515,7 +515,7 @@ def _apply_reference(
         windows = _fetch_reference(policy)
         if windows:
             settings.reference_path.parent.mkdir(parents=True, exist_ok=True)
-            settings.reference_path.write_text(json.dumps(windows, indent=1, sort_keys=True))
+            _ = settings.reference_path.write_text(json.dumps(windows, indent=1, sort_keys=True))
             state = state.model_copy(update={"reference_fetched": now})
             LOGGER.info("reference catalog refreshed: %d models", len(windows))
     try:

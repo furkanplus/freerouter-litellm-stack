@@ -8,7 +8,16 @@ from typing import TYPE_CHECKING
 
 from freerouter.discovery import DiscoveryResult, _finish, _model_ids
 from freerouter.planning import POOL_ALIAS, canonical_alias, plan_deployments
-from freerouter.policy import MIN_CONTEXT, Override, Policy, Role, hard_rejection, parse_params
+from freerouter.policy import (
+    MIN_CONTEXT,
+    Override,
+    Policy,
+    Role,
+    hard_rejection,
+    load_policy,
+    parse_params,
+)
+from freerouter.probe import outcome_for
 from freerouter.refresh import CycleContext, Settings, apply_plan, run_cycle
 from freerouter.state import (
     HealthStatus,
@@ -20,6 +29,7 @@ from freerouter.state import (
     record_tools,
 )
 from freerouter.traffic import context_signals, learned_ceiling, stated_limit
+from freerouter.transport import dig
 from tests.conftest import NOW, make_health, make_provider, make_state
 from tests.test_refresh import CHATTY, FakeGateway, _wire
 
@@ -27,6 +37,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
+
+    from freerouter.transport import JsonValue
 
 ENV = {"DEMO_API_KEY": "secret"}
 HEALTHY = HealthStatus.HEALTHY
@@ -87,7 +99,7 @@ def test_require_keeps_only_entries_marked_free_by_a_field() -> None:
     provider = make_provider(
         discovery={"mode": "static", "models": [], "require": {"tier": ["turbo"]}}
     )
-    payload = {
+    payload: JsonValue = {
         "data": [
             {"id": "glm-5.2", "tier": "turbo", "context_window": {"tokens": 976000}},
             {"id": "claude-opus-5", "tier": "pro", "context_window": {"tokens": 1000000}},
@@ -161,10 +173,13 @@ def test_merge_map_and_roles_shape_the_aliases() -> None:
     # Then
     aliases = {d.alias for d in plan}
     assert {"gemma-4-31b", "hermes-smart", "hermes-long", "nemotron-3-ultra-550b-a55b"} <= aliases
-    assert all("order" not in d.payload()["litellm_params"] for d in plan)
+    for deployment in plan:
+        params = deployment.payload()["litellm_params"]
+        assert isinstance(params, dict)
+        assert "order" not in params
     assert "demo-free" not in aliases
     row = next(d for d in plan if d.alias == "hermes-smart")
-    assert row.payload()["model_info"]["max_input_tokens"] == 262_144
+    assert dig(row.payload(), "model_info.max_input_tokens") == 262_144
 
 
 def test_tiered_roles_emit_litellm_order_and_skip_unlisted_models() -> None:
@@ -182,7 +197,7 @@ def test_tiered_roles_emit_litellm_order_and_skip_unlisted_models() -> None:
 
     # Then
     orders = {
-        d.model_id: d.payload()["litellm_params"].get("order")
+        d.model_id: dig(d.payload(), "litellm_params.order")
         for d in plan
         if d.alias == "hermes-smart"
     }
@@ -204,8 +219,6 @@ def test_a_too_large_prompt_never_counts_as_a_health_failure() -> None:
 
 
 def test_a_spent_free_allowance_quarantines_at_once_even_when_it_arrives_as_a_429() -> None:
-    from freerouter.probe import outcome_for
-
     spent = "You've used this period's free allowance. Your next rolling 7-day period starts"
     locked = "Daily check-in required to use free models"
     assert outcome_for(429, spent) is ProbeOutcome.EXHAUSTED
@@ -238,7 +251,7 @@ def test_limits_are_read_from_too_large_errors() -> None:
 
 
 def test_traffic_learns_both_a_proven_floor_and_a_ceiling() -> None:
-    entries = [
+    entries: list[JsonValue] = [
         {
             "model_id": "d1",
             "startTime": "2026-08-25T12:01:00",
@@ -332,11 +345,11 @@ def test_the_circuit_breaker_refuses_a_mass_delete(tmp_path: Path) -> None:
 
 
 def test_policy_files_are_loaded(tmp_path: Path) -> None:
-    from freerouter.policy import load_policy
-
-    (tmp_path / "aliases.yaml").write_text("merge:\n  a: b\nexclude: [free]\n")
-    (tmp_path / "roles.yaml").write_text("roles:\n  hermes-long: {min_context: 200000}\n")
-    (tmp_path / "capabilities.yaml").write_text("overrides:\n  x: {context: 9000, keep: false}\n")
+    _ = (tmp_path / "aliases.yaml").write_text("merge:\n  a: b\nexclude: [free]\n")
+    _ = (tmp_path / "roles.yaml").write_text("roles:\n  hermes-long: {min_context: 200000}\n")
+    _ = (tmp_path / "capabilities.yaml").write_text(
+        "overrides:\n  x: {context: 9000, keep: false}\n"
+    )
     policy = load_policy(tmp_path)
     assert policy.canonical("a") == "b"
     assert "free" in policy.exclude

@@ -45,6 +45,6 @@ import pytest  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _no_reference_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
+def no_reference_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep cycle tests offline: the daily reference-catalog fetch would hit OpenRouter."""
     monkeypatch.setattr("freerouter.refresh._fetch_reference", lambda _policy: None)

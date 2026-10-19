@@ -82,7 +82,7 @@ def parse_params(model_id: str) -> float | None:
     lowered = model_id.lower()
     if _EXPERTS.search(lowered):
         return None
-    sizes = [float(match) for match in _SIZE.findall(lowered)]
+    sizes = [float(match[1]) for match in _SIZE.finditer(lowered)]
     return max(sizes) if sizes else None
 
 
@@ -122,10 +122,10 @@ class Role:
 
 @dataclass(frozen=True, slots=True)
 class Policy:
-    merge: Mapping[str, str] = field(default_factory=dict)
+    merge: Mapping[str, str] = field(default_factory=dict[str, str])
     exclude: frozenset[str] = frozenset()
-    roles: Mapping[str, Role] = field(default_factory=dict)
-    overrides: Mapping[str, Override] = field(default_factory=dict)
+    roles: Mapping[str, Role] = field(default_factory=dict[str, Role])
+    overrides: Mapping[str, Override] = field(default_factory=dict[str, Override])
 
     def canonical(self, alias: str) -> str:
         """Map a heuristic canonical alias onto the explicit merge target."""
