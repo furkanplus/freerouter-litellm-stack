@@ -1,0 +1,83 @@
+[
+  {
+    "id": "valid",
+    "text": "{\"alpha\": 131072}",
+    "expected": 131072
+  },
+  {
+    "id": "missing-alias-clears",
+    "text": "{\"beta\": 131072}",
+    "expected": null
+  },
+  {
+    "id": "empty-clears",
+    "text": "{}",
+    "expected": null
+  },
+  {
+    "id": "invalid-json-retains",
+    "text": "{",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "null-root",
+    "text": "null",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "list-root",
+    "text": "[]",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "integer-root",
+    "text": "42",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "string-root",
+    "text": "\"alpha\"",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "numeric-string-not-validated",
+    "text": "{\"alpha\":\"131072\"}",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "bool-not-validated",
+    "text": "{\"alpha\":true}",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "negative-not-validated",
+    "text": "{\"alpha\":-1}",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "float-not-validated",
+    "text": "{\"alpha\":64000.9}",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "null-value-clears",
+    "text": "{\"alpha\":null}",
+    "expected": 70000,
+    "refresh": true
+  },
+  {
+    "id": "array-value-not-validated",
+    "text": "{\"alpha\":[]}",
+    "expected": 70000,
+    "refresh": true
+  }
+]

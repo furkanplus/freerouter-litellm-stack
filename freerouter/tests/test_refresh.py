@@ -63,7 +63,7 @@ class FakeGateway:
         return {deployment.alias for deployment in self.deployments.values()}
 
 
-def _wire(
+def wire_gateway(
     monkeypatch: pytest.MonkeyPatch,
     gateway: FakeGateway,
     providers: Sequence[Provider],
@@ -92,7 +92,7 @@ def test_a_new_model_is_probed_before_it_joins_the_shared_pool(
     # Given
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     gateway = FakeGateway()
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -115,7 +115,7 @@ def test_a_dead_model_is_pulled_out_of_the_pool_but_stays_addressable(
     # Given
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     gateway = FakeGateway({"fr/demo/alpha": GONE})
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -138,7 +138,7 @@ def test_removing_a_key_takes_that_platform_out_of_the_pool(
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     gateway = FakeGateway()
     settings = _settings(tmp_path)
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -148,7 +148,7 @@ def test_removing_a_key_takes_that_platform_out_of_the_pool(
     assert gateway.aliases()
 
     # When the credential goes away
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -169,7 +169,7 @@ def test_a_catalog_outage_never_empties_an_already_working_pool(
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     gateway = FakeGateway()
     settings = _settings(tmp_path)
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -178,7 +178,7 @@ def test_a_catalog_outage_never_empties_an_already_working_pool(
     _ = run_cycle(settings, {"DEMO_API_KEY": "k"})
 
     # When
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -200,7 +200,7 @@ def test_a_repeated_provider_error_is_reported_only_once(
     gateway = FakeGateway()
     settings = _settings(tmp_path)
     results = {"demo": DiscoveryResult(provider_id="demo", error="catalog HTTP 503")}
-    _wire(monkeypatch, gateway, [provider], results)
+    wire_gateway(monkeypatch, gateway, [provider], results)
 
     # When
     first = run_cycle(settings, {"DEMO_API_KEY": "k"})
@@ -223,7 +223,7 @@ def test_an_expiring_offer_is_announced_once(
     )
     gateway = FakeGateway()
     settings = _settings(tmp_path)
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -244,7 +244,7 @@ def test_state_and_changelog_land_on_disk(tmp_path: Path, monkeypatch: pytest.Mo
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     gateway = FakeGateway()
     settings = _settings(tmp_path)
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],
@@ -268,7 +268,7 @@ def test_a_failed_request_in_the_call_log_is_counted_once(
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     gateway = FakeGateway()
     settings = _settings(tmp_path)
-    _wire(
+    wire_gateway(
         monkeypatch,
         gateway,
         [provider],

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: freerouter
+
+jobs:
+  check:
+    name: CI (${{ matrix.check }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: pytest
+            command: uv run pytest
+          - check: ruff
+            command: uv run ruff check .
+          - check: types
+            command: uv run basedpyright
+          - check: compose
+            command: cp .env.example .env && docker compose config --quiet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - run: uv sync --locked --all-groups
+      - name: Run ${{ matrix.check }}
+        run: ${{ matrix.command }}

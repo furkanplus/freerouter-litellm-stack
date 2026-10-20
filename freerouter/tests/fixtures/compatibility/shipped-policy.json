@@ -1,0 +1,110 @@
+{
+  "merge": {
+    "dots3-note-prev": "dots-3-note-preview",
+    "north-mini-code-1-0": "north-mini-code",
+    "nemotron-3-ultra": "nemotron-3-ultra-550b-a55b",
+    "nemotron-3-super": "nemotron-3-super-120b-a12b",
+    "nemotron-3.5-lightning-30b-a3b": "nemotron-3.5-lightning",
+    "qwen-3-coder-30-a3b": "qwen-3-coder-30b-a3b",
+    "codestral-2508": "codestral-latest"
+  },
+  "exclude": [
+    "auto",
+    "free"
+  ],
+  "roles": {
+    "hermes-fast": {
+      "include": [],
+      "min_context": null,
+      "tiers": [
+        [
+          "gpt-oss-120b",
+          "deepseek-v4.1-flash",
+          "nemotron-3-super-120b-a12b",
+          "mimo-v2.6-flash"
+        ],
+        [
+          "gpt-oss-20b",
+          "deepseek-v4-flash",
+          "qwen-3.8-27b",
+          "qwen-3.8-flash",
+          "glm-4.7-flash",
+          "glm-5.3-flash",
+          "nemotron-3.5-lightning",
+          "step-3.5-flash"
+        ]
+      ]
+    },
+    "hermes-smart": {
+      "include": [],
+      "min_context": null,
+      "tiers": [
+        [
+          "deepseek-v4.1-flash",
+          "deepseek-v4-pro-0813",
+          "mimo-v2.6-pro",
+          "kimi-k3",
+          "gpt-oss-120b"
+        ],
+        [
+          "nemotron-3-super-120b-a12b",
+          "nemotron-3-ultra-550b-a55b",
+          "glm-5.3",
+          "glm-5.2",
+          "minimax-m3",
+          "kimi-k2.6",
+          "qwen-3.8-max",
+          "command-a-plus-05-2026"
+        ],
+        [
+          "minimax-m2.7",
+          "gemini-3.8-flash"
+        ]
+      ]
+    },
+    "hermes-coder": {
+      "include": [],
+      "min_context": null,
+      "tiers": [
+        [
+          "deepseek-v4.1-flash",
+          "deepseek-v4-pro-0813",
+          "kimi-k2.7-code"
+        ],
+        [
+          "glm-5.3",
+          "minimax-m2.7",
+          "minimax-m3",
+          "codestral-latest"
+        ],
+        [
+          "qwen-3-coder-30b-a3b",
+          "north-mini-code",
+          "laguna-s-2.1",
+          "mistral-code-latest"
+        ]
+      ]
+    },
+    "hermes-vision": {
+      "include": [],
+      "min_context": null,
+      "tiers": [
+        [
+          "gemma-4-31b",
+          "qwen-3-vl-30b"
+        ],
+        [
+          "gemma-4-26b-a4b",
+          "mistral-small-3.2-24b",
+          "llama-4-scout-17b-16e"
+        ]
+      ]
+    },
+    "hermes-long": {
+      "include": [],
+      "min_context": 400000,
+      "tiers": []
+    }
+  },
+  "overrides": {}
+}

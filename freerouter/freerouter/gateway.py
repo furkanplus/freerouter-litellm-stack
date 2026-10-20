@@ -18,7 +18,7 @@ TOOL_PROBE_MAX_TOKENS: Final = 1024
 """Room for a reasoning model to think before it emits the call; 16 tokens (the old
 plain-chat probe) would read every reasoning model as unable to call tools."""
 TOOL_PROBE_PROMPT: Final = "What is the weather in Paris right now? Use the get_weather tool."
-TOOL_PROBE_TOOLS: Final = (
+TOOL_PROBE_TOOLS: Final[tuple[dict[str, JsonValue], ...]] = (
     {
         "type": "function",
         "function": {
