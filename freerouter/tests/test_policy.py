@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from freerouter.discovery import DiscoveryResult, _finish, _model_ids
+from freerouter.discovery import DiscoveryResult, discover
 from freerouter.planning import POOL_ALIAS, canonical_alias, plan_deployments
 from freerouter.policy import (
     MIN_CONTEXT,
@@ -29,9 +30,9 @@ from freerouter.state import (
     record_tools,
 )
 from freerouter.traffic import context_signals, learned_ceiling, stated_limit
-from freerouter.transport import dig
+from freerouter.transport import Response, dig
 from tests.conftest import NOW, make_health, make_provider, make_state
-from tests.test_refresh import CHATTY, FakeGateway, _wire
+from tests.test_refresh import CHATTY, FakeGateway, wire_gateway
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -72,9 +73,10 @@ def test_the_name_filter_ignores_the_vendor_path() -> None:
     assert hard_rejection("@cf/ibm/granite-4.0-h-micro") is not None
 
 
-def test_the_cap_keeps_the_biggest_usable_models_not_the_first_alphabetically() -> None:
+def test_the_cap_keeps_the_biggest_usable_models_not_the_first_alphabetically(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # Given: upstream sorted alphabetically and cut, keeping llama-3.2-1b over gpt-oss-120b
-    provider = make_provider(max_models=2)
     entries = (
         ("@cf/meta/llama-3.2-1b", None),
         ("@cf/ibm/granite-4.0-h-micro", None),
@@ -85,7 +87,20 @@ def test_the_cap_keeps_the_biggest_usable_models_not_the_first_alphabetically() 
     )
 
     # When
-    result = _finish(provider, entries)
+    provider = make_provider(
+        max_models=2,
+        discovery={
+            "mode": "listing",
+            "url": "https://demo.example/models",
+            "whole_catalog_is_free": True,
+        },
+    )
+    payload = {"data": [{"id": name, "context_length": context} for name, context in entries]}
+    monkeypatch.setattr(
+        "freerouter.discovery.request",
+        lambda *_args, **_kwargs: Response(200, json.dumps(payload).encode()),
+    )
+    result = discover(provider, ENV)
 
     # Then
     assert result.models == ("@cf/moonshot/kimi-k2.6", "@cf/openai/gpt-oss-120b")
@@ -95,9 +110,15 @@ def test_the_cap_keeps_the_biggest_usable_models_not_the_first_alphabetically() 
     assert dict(result.context) == {"@cf/moonshot/kimi-k2.6": 262144}
 
 
-def test_require_keeps_only_entries_marked_free_by_a_field() -> None:
+def test_require_keeps_only_entries_marked_free_by_a_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     provider = make_provider(
-        discovery={"mode": "static", "models": [], "require": {"tier": ["turbo"]}}
+        discovery={
+            "mode": "listing",
+            "url": "https://demo.example/models",
+            "require": {"tier": ["turbo"]},
+        }
     )
     payload: JsonValue = {
         "data": [
@@ -105,7 +126,13 @@ def test_require_keeps_only_entries_marked_free_by_a_field() -> None:
             {"id": "claude-opus-5", "tier": "pro", "context_window": {"tokens": 1000000}},
         ]
     }
-    assert _model_ids(payload, provider.discovery) == (("glm-5.2", 976000),)
+    monkeypatch.setattr(
+        "freerouter.discovery.request",
+        lambda *_args, **_kwargs: Response(200, json.dumps(payload).encode()),
+    )
+    result = discover(provider, ENV)
+    assert result.models == ("glm-5.2",)
+    assert result.context == (("glm-5.2", 976000),)
 
 
 def test_a_small_window_deployment_is_rejected_but_the_same_model_elsewhere_is_not() -> None:
@@ -295,7 +322,7 @@ def test_a_model_that_never_calls_tools_leaves_the_pool_but_stays_probeable(
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     gateway = FakeGateway(replies={"fr/demo/alpha": CHATTY})
     result = {"demo": DiscoveryResult(provider_id="demo", models=("alpha",))}
-    _wire(monkeypatch, gateway, [provider], result)
+    wire_gateway(monkeypatch, gateway, [provider], result)
 
     # When: two cycles, each answering in plain text
     _ = run_cycle(_settings(tmp_path), ENV)
@@ -308,16 +335,17 @@ def test_a_model_that_never_calls_tools_leaves_the_pool_but_stays_probeable(
 
 
 def test_a_re_id_is_not_a_mass_delete(tmp_path: Path) -> None:
-    # Given: 40 live rows whose ids all change (new fingerprint), same routes
+    # Given: three live rows whose ids all change (new fingerprint), same routes
     provider = make_provider(discovery={"mode": "static", "models": ["alpha"]})
     state = make_state(make_health(status=HEALTHY))
     gateway = FakeGateway()
-    for index in range(3):
-        gateway.deployments[f"fr-old{index:013d}"] = None  # type: ignore[assignment]
+    for index, deployment in enumerate(plan_deployments([provider], state, ENV)):
+        identifier = f"fr-old{index:013d}"
+        gateway.deployments[identifier] = replace(deployment, deployment_id=identifier)
     strict = CycleContext(now=NOW, settings=_settings(tmp_path, 0.25))
 
     # When
-    added, deleted, errors = apply_plan(gateway, [provider], state, ENV, strict)  # type: ignore[arg-type]
+    added, deleted, errors = apply_plan(gateway, [provider], state, ENV, strict)
 
     # Then: net change is 0, so the old ids go
     assert (added, deleted, errors) == (3, 3, [])
@@ -327,20 +355,22 @@ def test_the_circuit_breaker_refuses_a_mass_delete(tmp_path: Path) -> None:
     # Given: 40 live managed rows and a plan that wants none of them
     gateway = FakeGateway()
     provider = make_provider()
+    template = plan_deployments([provider], make_state(make_health(status=HEALTHY)), ENV)[0]
     for index in range(40):
-        gateway.deployments[f"fr-{index:016d}"] = None  # type: ignore[assignment]
+        identifier = f"fr-{index:016d}"
+        gateway.deployments[identifier] = replace(template, deployment_id=identifier)
 
     strict = CycleContext(now=NOW, settings=_settings(tmp_path, 0.25))
     loose = CycleContext(now=NOW, settings=_settings(tmp_path, 1.0))
 
     # When
-    _, deleted, errors = apply_plan(gateway, [provider], make_state(), ENV, strict)  # type: ignore[arg-type]
+    _, deleted, errors = apply_plan(gateway, [provider], make_state(), ENV, strict)
 
     # Then
     assert deleted == 0
     assert len(gateway.deployments) == 40
     assert any("circuit breaker" in error for error in errors)
-    _, deleted, _ = apply_plan(gateway, [provider], make_state(), ENV, loose)  # type: ignore[arg-type]
+    _, deleted, _ = apply_plan(gateway, [provider], make_state(), ENV, loose)
     assert deleted == 40
 
 

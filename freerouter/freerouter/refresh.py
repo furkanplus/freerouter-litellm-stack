@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Protocol
 
 from freerouter.discovery import discover
 from freerouter.errors import GatewayError, MissingMasterKeyError
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from datetime import date, datetime
 
     from freerouter.discovery import DiscoveryResult
+    from freerouter.planning import Deployment
     from freerouter.registry import Provider
 
 LOGGER: Final = logging.getLogger("freerouter")
@@ -251,8 +252,24 @@ def _store_context(state: HealthState, provider_id: str, context: Mapping[str, i
     return state.model_copy(update={"models": models})
 
 
+class PlanGateway(Protocol):
+    """Only the gateway operations required to reconcile a deployment plan."""
+
+    def managed_ids(self) -> tuple[str, ...]:
+        """List current deployment identifiers."""
+        ...
+
+    def add(self, deployment: Deployment) -> None:
+        """Register one planned deployment."""
+        ...
+
+    def delete(self, identifier: str) -> None:
+        """Remove one deployment by identifier."""
+        ...
+
+
 def apply_plan(
-    gateway: Gateway,
+    gateway: PlanGateway,
     providers: Sequence[Provider],
     state: HealthState,
     env: Mapping[str, str],

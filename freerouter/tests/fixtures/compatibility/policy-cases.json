@@ -1,0 +1,547 @@
+[
+  {
+    "id": "empty-document",
+    "files": {
+      "aliases.yaml": ""
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "numeric-aliases-coerce",
+    "files": {
+      "aliases.yaml": "merge: {1: 2}\n"
+    },
+    "expected": {
+      "merge": {
+        "1": "2"
+      },
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "list-exclude",
+    "files": {
+      "aliases.yaml": "exclude: [free, auto]\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [
+        "auto",
+        "free"
+      ],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "scalar-exclude-iterates-characters",
+    "files": {
+      "aliases.yaml": "exclude: free\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [
+        "e",
+        "f",
+        "r"
+      ],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "mapping-exclude-iterates-keys",
+    "files": {
+      "aliases.yaml": "exclude: {free: true}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [
+        "free"
+      ],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "falsey-alias-sections-null",
+    "files": {
+      "aliases.yaml": "merge: null\nexclude: null\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "falsey-alias-sections-false",
+    "files": {
+      "aliases.yaml": "merge: false\nexclude: false\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "falsey-alias-sections-0",
+    "files": {
+      "aliases.yaml": "merge: 0\nexclude: 0\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "falsey-alias-sections-[]",
+    "files": {
+      "aliases.yaml": "merge: []\nexclude: []\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "falsey-alias-sections-''",
+    "files": {
+      "aliases.yaml": "merge: ''\nexclude: ''\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "role-include-list",
+    "files": {
+      "roles.yaml": "roles: {demo: {include: [alpha]}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [
+            "alpha"
+          ],
+          "min_context": null,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "role-scalar-include-characters",
+    "files": {
+      "roles.yaml": "roles: {demo: {include: alpha}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [
+            "a",
+            "l",
+            "p",
+            "h",
+            "a"
+          ],
+          "min_context": null,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "role-mapping-include-keys",
+    "files": {
+      "roles.yaml": "roles: {demo: {include: {alpha: false}}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [
+            "alpha"
+          ],
+          "min_context": null,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "role-tiers-list",
+    "files": {
+      "roles.yaml": "roles: {demo: {tiers: [[alpha, beta], [gamma]]}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": null,
+          "tiers": [
+            [
+              "alpha",
+              "beta"
+            ],
+            [
+              "gamma"
+            ]
+          ]
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "role-tiers-scalar",
+    "files": {
+      "roles.yaml": "roles: {demo: {tiers: ab}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": null,
+          "tiers": [
+            [
+              "a"
+            ],
+            [
+              "b"
+            ]
+          ]
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "role-tier-scalar",
+    "files": {
+      "roles.yaml": "roles: {demo: {tiers: [alpha]}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": null,
+          "tiers": [
+            [
+              "a",
+              "l",
+              "p",
+              "h",
+              "a"
+            ]
+          ]
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "role-null-body",
+    "files": {
+      "roles.yaml": "roles: {demo: null}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": null,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion-64000",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: 64000}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": 64000,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion-'64000'",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: '64000'}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": 64000,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion-64000.9",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: 64000.9}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": 64000,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion-true",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: true}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": 1,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion-false",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: false}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": null,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion-0",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: 0}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": null,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion-'0'",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: '0'}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": 0,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "context-coercion--1",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: -1}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {
+        "demo": {
+          "include": [],
+          "min_context": -1,
+          "tiers": []
+        }
+      },
+      "overrides": {}
+    }
+  },
+  {
+    "id": "override-booleans-only",
+    "files": {
+      "capabilities.yaml": "overrides: {demo: {context: '64000', tools: 'true', keep: 1}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {
+        "demo": {
+          "context": 64000,
+          "tools": null,
+          "keep": null
+        }
+      }
+    }
+  },
+  {
+    "id": "override-actual-booleans",
+    "files": {
+      "capabilities.yaml": "overrides: {demo: {context: 64000, tools: false, keep: true, why: test}}\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {
+        "demo": {
+          "context": 64000,
+          "tools": false,
+          "keep": true
+        }
+      }
+    }
+  },
+  {
+    "id": "unknown-metadata-ignored",
+    "files": {
+      "aliases.yaml": "distinct: [[a,b]]\nextra: typo\n"
+    },
+    "expected": {
+      "merge": {},
+      "exclude": [],
+      "roles": {},
+      "overrides": {}
+    }
+  },
+  {
+    "id": "nonmapping-root",
+    "files": {
+      "aliases.yaml": "[]"
+    },
+    "error": "PolicyError"
+  },
+  {
+    "id": "truthy-list-merge",
+    "files": {
+      "aliases.yaml": "merge: [alpha]"
+    },
+    "error": "PolicyError"
+  },
+  {
+    "id": "truthy-scalar-role",
+    "files": {
+      "roles.yaml": "roles: {demo: alpha}"
+    },
+    "error": "PolicyError"
+  },
+  {
+    "id": "scalar-roles",
+    "files": {
+      "roles.yaml": "roles: alpha"
+    },
+    "error": "PolicyError"
+  },
+  {
+    "id": "invalid-number",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: typo}}"
+    },
+    "error": "PolicyError"
+  },
+  {
+    "id": "infinite-number",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: .inf}}"
+    },
+    "error": "OverflowError"
+  },
+  {
+    "id": "nan-number",
+    "files": {
+      "roles.yaml": "roles: {demo: {min_context: .nan}}"
+    },
+    "error": "PolicyError"
+  },
+  {
+    "id": "truthy-number-include",
+    "files": {
+      "roles.yaml": "roles: {demo: {include: 42}}"
+    },
+    "error": "PolicyError"
+  },
+  {
+    "id": "broken-yaml",
+    "files": {
+      "aliases.yaml": "merge: [unterminated"
+    },
+    "error": "PolicyError"
+  }
+]

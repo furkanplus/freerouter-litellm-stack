@@ -6,7 +6,7 @@ from datetime import date
 from enum import StrEnum
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Final
+from typing import TYPE_CHECKING, ClassVar, Final, Protocol, Self, TypeVar
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -19,7 +19,6 @@ from freerouter.errors import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping, Sequence
-    from typing import Any
 
 ENV_PLACEHOLDER: Final = re.compile(r"\$\{([A-Z0-9_]+)\}")
 DEFAULT_PROVIDERS_DIR: Final = Path("providers")
@@ -252,13 +251,22 @@ def matches_any(model_id: str, patterns: Sequence[str]) -> bool:
     return any(fnmatchcase(lowered, pattern.lower()) for pattern in patterns)
 
 
+class Sortable(Protocol):
+    """A homogeneous sort key with Python's ordinary less-than operation."""
+
+    def __lt__(self, other: Self, /) -> bool: ...
+
+
+SortKey = TypeVar("SortKey", bound=Sortable)
+
+
 def select_models(
     model_ids: Iterable[str],
     *,
     allow: Sequence[str],
     deny: Sequence[str],
     limit: int,
-    rank: Callable[[str], Any] | None = None,
+    rank: Callable[[str], SortKey] | None = None,
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Apply allow, deny, and the per-provider cap.
 
