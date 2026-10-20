@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, cast
 
 import yaml
 
@@ -200,54 +200,113 @@ class Policy:
         return tuple(joined)
 
 
+def _mapping(value: object, path: Path, field: str) -> dict[str, object]:
+    """Validate a string-keyed mapping without coercing routing names."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise PolicyError(path=str(path), reason=f"{field}: expected a mapping")
+    result: dict[str, object] = {}
+    for key, item in cast("dict[object, object]", value).items():
+        if not isinstance(key, str):
+            raise PolicyError(path=str(path), reason=f"{field}: expected string keys")
+        result[key] = item
+    return result
+
+
+def _strings(value: object, path: Path, field: str) -> tuple[str, ...]:
+    """Validate an optional list of routing names, preserving its order."""
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise PolicyError(path=str(path), reason=f"{field}: expected a list of strings")
+    result: list[str] = []
+    for item in cast("list[object]", value):
+        if not isinstance(item, str):
+            raise PolicyError(path=str(path), reason=f"{field}: expected string entries")
+        result.append(item)
+    return tuple(result)
+
+
+def _context(value: object, path: Path, field: str) -> int | None:
+    """Accept positive integer token counts, never bools or lossy coercions."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise PolicyError(path=str(path), reason=f"{field}: expected a positive integer")
+    return value
+
+
+def _boolean(value: object, path: Path, field: str) -> bool | None:
+    """Accept actual optional boolean capability flags."""
+    if value is not None and not isinstance(value, bool):
+        raise PolicyError(path=str(path), reason=f"{field}: expected a boolean")
+    return value
+
+
 def _read(path: Path) -> dict[str, object]:
-    """Read one optional YAML mapping, treating a missing file as empty."""
-    if not path.exists():
-        return {}
+    """Read one optional YAML mapping; all decoding failures are recoverable."""
     try:
-        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as error:
-        raise PolicyError(path=str(path), reason="malformed YAML") from error
-    if loaded is None:
+        loaded = cast("object", yaml.safe_load(path.read_text(encoding="utf-8")))
+    except FileNotFoundError:
         return {}
-    if not isinstance(loaded, dict):
-        raise PolicyError(path=str(path), reason="expected a mapping")
-    return loaded
+    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        raise PolicyError(path=str(path), reason="unreadable or malformed YAML") from error
+    return _mapping(loaded, path, "document")
 
 
-def _load_policy(directory: Path) -> Policy:
-    """Load ``aliases.yaml``, ``roles.yaml`` and ``capabilities.yaml`` from ``directory``."""
-    aliases = _read(directory / "aliases.yaml")
-    merge = {str(k): str(v) for k, v in (aliases.get("merge") or {}).items()}
-    exclude = frozenset(str(item) for item in aliases.get("exclude") or ())
-
+def _roles(path: Path) -> dict[str, Role]:
+    """Validate roles, retaining tiers-over-include precedence and metadata."""
     roles: dict[str, Role] = {}
-    for name, body in (_read(directory / "roles.yaml").get("roles") or {}).items():
-        spec = body or {}
-        roles[str(name)] = Role(
-            include=tuple(str(item) for item in spec.get("include") or ()),
-            min_context=int(spec["min_context"]) if spec.get("min_context") else None,
-            tiers=tuple(
-                tuple(str(item) for item in tier or ()) for tier in spec.get("tiers") or ()
-            ),
+    for name, body in _mapping(_read(path).get("roles"), path, "roles").items():
+        field = f"roles.{name}"
+        spec = _mapping(body, path, field)
+        raw_tiers = spec.get("tiers")
+        tiers: list[tuple[str, ...]] = []
+        if raw_tiers is not None:
+            if not isinstance(raw_tiers, list):
+                raise PolicyError(path=str(path), reason=f"{field}.tiers: expected nested lists")
+            for index, tier in enumerate(cast("list[object]", raw_tiers)):
+                # A null section is optional, but each supplied tier must be a list.
+                if tier is None:
+                    raise PolicyError(
+                        path=str(path), reason=f"{field}.tiers[{index}]: expected a list"
+                    )
+                tiers.append(_strings(tier, path, f"{field}.tiers[{index}]"))
+        roles[name] = Role(
+            include=_strings(spec.get("include"), path, f"{field}.include"),
+            min_context=_context(spec.get("min_context"), path, f"{field}.min_context"),
+            tiers=tuple(tiers),
         )
+    return roles
 
+
+def _overrides(path: Path) -> dict[str, Override]:
+    """Validate recognized capabilities, leaving extension metadata uninterpreted."""
     overrides: dict[str, Override] = {}
-    for key, body in (_read(directory / "capabilities.yaml").get("overrides") or {}).items():
-        spec = body or {}
-        overrides[str(key)] = Override(
-            context=int(spec["context"]) if spec.get("context") else None,
-            tools=spec.get("tools") if isinstance(spec.get("tools"), bool) else None,
-            keep=spec.get("keep") if isinstance(spec.get("keep"), bool) else None,
+    for key, body in _mapping(_read(path).get("overrides"), path, "overrides").items():
+        field = f"overrides.{key}"
+        spec = _mapping(body, path, field)
+        overrides[key] = Override(
+            context=_context(spec.get("context"), path, f"{field}.context"),
+            tools=_boolean(spec.get("tools"), path, f"{field}.tools"),
+            keep=_boolean(spec.get("keep"), path, f"{field}.keep"),
         )
-    return Policy(merge=merge, exclude=exclude, roles=roles, overrides=overrides)
+    return overrides
 
 
 def load_policy(directory: Path = DEFAULT_POLICY_DIR) -> Policy:
     """Load policy atomically; a bad edit must not become an empty routing policy."""
-    try:
-        return _load_policy(directory)
-    except (AttributeError, TypeError, ValueError) as error:
-        raise PolicyError(
-            path=str(directory), reason="invalid policy structure or value"
-        ) from error
+    path = directory / "aliases.yaml"
+    aliases = _read(path)
+    merge: dict[str, str] = {}
+    for key, value in _mapping(aliases.get("merge"), path, "merge").items():
+        if not isinstance(value, str):
+            raise PolicyError(path=str(path), reason=f"merge.{key}: expected a string")
+        merge[key] = value
+    return Policy(
+        merge=merge,
+        exclude=frozenset(_strings(aliases.get("exclude"), path, "exclude")),
+        roles=_roles(directory / "roles.yaml"),
+        overrides=_overrides(directory / "capabilities.yaml"),
+    )

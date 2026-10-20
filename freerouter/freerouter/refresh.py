@@ -7,7 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Protocol
+from tempfile import NamedTemporaryFile
+from typing import TYPE_CHECKING, Final, Protocol, cast
+
+from pydantic import ValidationError
 
 from freerouter.discovery import discover
 from freerouter.errors import GatewayError, MissingMasterKeyError
@@ -40,7 +43,7 @@ from freerouter.traffic import (
     learned_ceiling,
     newest_entry_time,
 )
-from freerouter.transport import as_items, as_strings, as_text, dig, request
+from freerouter.transport import JSON_ADAPTER, as_items, as_strings, as_text, dig, request
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -509,7 +512,12 @@ def _fetch_reference(policy: Policy) -> dict[str, int] | None:
     for item in as_items(dig(response.json(), "data")):
         model_id = as_text(dig(item, "id"))
         length = dig(item, "context_length")
-        if model_id is None or not isinstance(length, int) or length <= 0:
+        if (
+            model_id is None
+            or isinstance(length, bool)
+            or not isinstance(length, int)
+            or length <= 0
+        ):
             continue
         if "tools" not in as_strings(dig(item, "supported_parameters")):
             continue
@@ -518,26 +526,71 @@ def _fetch_reference(policy: Policy) -> dict[str, int] | None:
     return windows
 
 
+def _reference_windows(value: object) -> dict[str, int] | None:
+    """Validate the entire cache snapshot before applying any of its entries."""
+    if not isinstance(value, dict):
+        return None
+    windows: dict[str, int] = {}
+    for alias, length in cast("dict[object, object]", value).items():
+        if (
+            not isinstance(alias, str)
+            or not alias
+            or isinstance(length, bool)
+            or not isinstance(length, int)
+            or length <= 0
+        ):
+            return None
+        windows[alias] = length
+    return windows
+
+
+def _save_reference(path: Path, windows: Mapping[str, int]) -> None:
+    """Replace the cache atomically; a failed write leaves the prior file intact."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, delete=False
+        ) as stream:
+            temporary = Path(stream.name)
+            _ = stream.write(json.dumps(windows, indent=1, sort_keys=True))
+        _ = temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def _apply_reference(
     state: HealthState, settings: Settings, policy: Policy, now: datetime
 ) -> HealthState:
-    """Fill ``ref_context`` from the reference catalog, refreshing it once a day.
+    """Apply validated reference windows, recovering corrupt caches immediately.
 
-    The reference is an upper bound for the *model*; a platform may serve less,
-    which the provider catalog or a "too large" error then corrects.
+    Valid snapshots retain daily refresh and missing-alias clearing semantics.
+    Bad snapshots never replace last-known validated health values or freshness.
     """
+    try:
+        windows = _reference_windows(
+            JSON_ADAPTER.validate_json(settings.reference_path.read_bytes())
+        )
+    except (OSError, ValidationError):
+        windows = None
     fetched = state.reference_fetched
     stale = fetched is None or now - fetched >= REFERENCE_MAX_AGE
-    if stale or not settings.reference_path.exists():
-        windows = _fetch_reference(policy)
-        if windows:
-            settings.reference_path.parent.mkdir(parents=True, exist_ok=True)
-            _ = settings.reference_path.write_text(json.dumps(windows, indent=1, sort_keys=True))
-            state = state.model_copy(update={"reference_fetched": now})
-            LOGGER.info("reference catalog refreshed: %d models", len(windows))
-    try:
-        windows = json.loads(settings.reference_path.read_text())
-    except (OSError, ValueError):
+    if stale or windows is None:
+        replacement = _reference_windows(_fetch_reference(policy))
+        if replacement:
+            try:
+                _save_reference(settings.reference_path, replacement)
+            except OSError:
+                LOGGER.warning("reference cache could not be saved; will retry next cycle")
+            else:
+                windows = replacement
+                state = state.model_copy(update={"reference_fetched": now})
+                LOGGER.info("reference catalog refreshed: %d models", len(windows))
+        else:
+            LOGGER.warning("reference refresh unavailable or invalid; will retry next cycle")
+    if windows is None:
+        LOGGER.warning("invalid or missing reference cache; retaining last-known contexts")
         return state
     models = dict(state.models)
     for key, health in state.models.items():

@@ -17,56 +17,67 @@
   {
     "id": "invalid-json-retains",
     "text": "{",
-    "expected": 70000
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "null-root",
     "text": "null",
-    "error": "AttributeError"
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "list-root",
     "text": "[]",
-    "error": "AttributeError"
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "integer-root",
     "text": "42",
-    "error": "AttributeError"
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "string-root",
     "text": "\"alpha\"",
-    "error": "AttributeError"
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "numeric-string-not-validated",
     "text": "{\"alpha\":\"131072\"}",
-    "expected": "131072"
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "bool-not-validated",
     "text": "{\"alpha\":true}",
-    "expected": true
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "negative-not-validated",
     "text": "{\"alpha\":-1}",
-    "expected": -1
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "float-not-validated",
     "text": "{\"alpha\":64000.9}",
-    "expected": 64000.9
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "null-value-clears",
     "text": "{\"alpha\":null}",
-    "expected": null
+    "expected": 70000,
+    "refresh": true
   },
   {
     "id": "array-value-not-validated",
     "text": "{\"alpha\":[]}",
-    "expected": []
+    "expected": 70000,
+    "refresh": true
   }
 ]
